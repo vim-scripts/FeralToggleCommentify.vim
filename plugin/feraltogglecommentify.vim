@@ -2,7 +2,7 @@
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
 " \file		feraltogglecommentify.vim
-" \date		Wed, 16 Jul 2003 17:48 PDT
+" \date		Mon, 21 Jul 2003 13:32 PDT
 "
 " \brief	Adds, removes or toggles comment characters. Ranges are supported
 "			as is custom text to insert/remove/toggle.
@@ -29,8 +29,11 @@
 " }}}
 "
 " \version	$Id$
-" Version:	1.55
+" Version:	1.56
 " History: {{{
+"	[Feral:202/03@13:31] 1.56
+"	BUG FIX:		Fixed silly cursor restore problem, screen no longer jumps
+"		on occasion.
 "	[Feral:196/03@07:30] 1.55
 "	Integrating changes from Jörn Horstmann. Changes are marked with "JH:".
 "	Improvement:	Added options to determine how this should react.
@@ -359,13 +362,16 @@ function s:DoCommentify(DaMode, DaBang, ...) " {{{
 
 
 	" Save where we are
-	let SavedMark = line('.') . 'G'.b:FTCSaveCol.'|'
+	let SavedMark = line('.').'G'.b:FTCSaveCol.'|'
 	normal! H
-	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
+"	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
+	let SavedMark = line('.').'Gzt'.SavedMark
 	if has('folding')
-		let SavedMark = SavedMark.'zN'
+		let SavedMark = 'zN'.SavedMark
 	endif
+	let SavedMark = 'normal! '.SavedMark
 	execute SavedMark
+
 
 	" [Feral:201/02@03:43] folded lines must be opend because a substitute
 	" operation on a fold effects all lines of the fold, so (temp) turn off
