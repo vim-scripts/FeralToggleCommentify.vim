@@ -1,0 +1,64 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=665
+
+This script offers simple, basic, line oriented commenting of files.
+Originally vimscript #4 (ToggleCommentify.vim v1.2 ) by Vincent Nijs
+Was mutilated into what you see here, for better or worse :)
+
+Following list of file types are currently (v1.55) supported:
+    ox, cpp, php, java, bnk, cs, ftf, torquescript, fte, html, xml, c, css,
+    pov, vim, lisp, scheme, dosini, tex, caos, m4, config, automake, python,
+    perl, make, [^w]sh$, tcl, jproperties, vb, aspvbs, plsql, lua,
+
+
+Three commands:
+:CC        " To Comment a line/range
+:UC        " To Uncomment a line/range
+:TC        " To Toggle comments on each line/range.
+
+All take optional arg to override default comment style
+i.e. ":CC --"
+
+Maps <m-c> to :TC if no command by that name already exists. Remap <Plug>FtcTc
+    at will.
+Maps <C-c> to a duplicate and comment, line/range; so you can easily make a
+    duplicate of the current line/range and comment it; then edit it the
+    original. Remap <Plug>FtcDLAC at will.
+
+**********
+New with v1.55:
+You can customize the behavior by specifying optional option vars. Each option
+var can be specified as buffer or global, with that precedence.
+
+Option: g:FTCOperateOnFirstColumnOnly
+    If this is 0 (false) then the comment char does not have to be at col1 to
+    be removed, in addition comment chars are placed just before the first word
+    of the line.
+Valid Values: 0 or 1
+Default: 1
+
+Option: g:FTCOperateOnlyOnNonComments
+    If 1 (true) a line will not be commented if it already starts with comment
+    chars. With this 0 (false) you can (easily) comment entire functions
+    without fear of messing up commenting (i.e. '<,'>CC ... '<,'>UC ...  I.e.
+    comment then uncomment. If this is true the above MAY not work (depending
+    on how the existing comments are.)
+Valid Values: 0 or 1
+Default: 0
+
+Option: g:FTCOperateOnBlankLines
+    If 1 (true) blank lines will be processed, else they are skipped.
+Valid Values: 0 or 1
+Default: 1
+
+Option: g:FTCBangEffectsWhat
+    Will toggle an option if command is banged: (i.e. :CC!)
+        1. OperateOnFirstColumnOnly
+        2. OperateOnlyOnNonComments
+        3. OperateOnBlankLines
+Valid Values: 1, 2 or 3
+Default: 1
+
+
+I.e. in .vimrc:
+let g:FTCOperateOnFirstColumnOnly = 0
+let g:FTCOperateOnlyOnNonComments = 1
