@@ -1,7 +1,8 @@
 " {{{ File header information
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
-" \file		FeralToggleCommentify.vim
+" \file		feraltogglecommentify.vim
+" \date		Sat, 12 Jul 2003 10:41 PDT
 "
 " \brief	Adds, removes or toggles comment characters on col1 at the touch
 "			of a key. Ranges are supported as are custom text to
@@ -10,7 +11,7 @@
 " \author	Robert KellyIV <Sreny@SverGbc.Pbz> (Rot13ed)
 " Based On: {{{
 " \note		Based On Vincent Nijs's ToggleCommentify.vim v1.2 Last Change:
-"			Sunday, June 9th, 2001
+"			Sunday, June 9th, 2001 (VIMSCRIPT#4)
 " \author	Vincent Nijs <Vincent.Nijs@econ.kuleuven.ac.be>
 " \note		Some comment definitions extracted from EnhancedCommentify.vim by
 "			Meikel Brandmeyer
@@ -20,16 +21,26 @@
 "			URL:	http://vim.sourceforge.net/script.php?script_id=4
 "			I am unable to UL new versions (reasonable, wasn't my script
 "			originally), so I'll make a new entry to keep updating this script
-" \note		This is VIMSCRIPT#???665??? (now):
-"			URL:	???
+" \note		This is VIMSCRIPT#665 (now):
+"			URL:	http://vim.sourceforge.net/scripts/script.php?script_id=665
 " Contrabutions From: {{{
 "	Bernhard Wagner		(12-Nov-2002 xml changes)
 " }}}
 "
-" \date		Wed, 13 Nov 2002 05:28 Pacific Standard Time
-" \version	$Id: FeralToggleCommentify.vim,v 1.8 2002/12/03 00:33:23 Feral Exp $
-" Version:	1.532
+" \version	$Id$
+" Version:	1.54
 " History: {{{
+"	[Feral:193/03@09:08] 1.54
+"	BUG FIX:		(minor) no longer complains when uncommenting and there
+"		are no comment char(s). (aka middle of a range is uncommented already)
+"	BUG FIX:		Respects 'hlsearch'; won't mess with highlighting if off,
+"		etc.  (Previous turned it on at end of script)
+"	Improvement:	Can now comment/uncomment a fold without opening it.
+"		(courtesy of normal! zn and normal! zN)
+"	Improvement:	Changed DLAC into a proper command (:DLAC) (from mapping);
+"		map <Plug>FtcDLAC as desired, defaults to <C-c>. Ranges are supported
+"		(default current line) and you can specify the comment chars just as
+"		you can with :CC, :TC, :UC.
 "	[Feral:155/03@06:40] 1.532
 "		Added: C# // comment style.
 "	[Feral:336/02@16:31] 1.531
@@ -39,7 +50,7 @@
 "	[Feral:317/02@05:27] 1.53
 "		Addition:	Incorperated Bernhard Wagner's 12-Nov-2002 v1.52 xml
 "			changes
-"		Improvment:	Will make default mappings to <M-c> only if no map to
+"		Improvement:	Will make default mappings to <M-c> only if no map to
 "			<Plug>FtcTC and <M-c> is unused.
 "	[Feral:309/02@18:44] 1.52
 "		Merged DLAC with this; DLAC = duplicate line and comment, simple
@@ -89,89 +100,6 @@
 "	use \ , i.e.
 "	:CC\ --
 "
-" Holding: Based on {{{
-"
-" ToggleCommentify.vim
-" Maintainer:	Vincent Nijs <Vincent.Nijs@econ.kuleuven.ac.be>
-" Version:		1.2	
-" Last Change:	Sunday, June 9th, 2001
-
-" Disription:
-" This is a (very) simple script to comment lines in a program. Currently supported languages are 
-" C, C++, PHP, the vim scripting language, python, and ox. Given the simplicity of the program it 
-" very easy to add support for new languages. The comments in the file should provide sufficient 
-" information on how to proceed. 
-
-" Install Details:
-" You can put the functions in the attachment directly into your .vimrc or in a separate file to 
-" be sourced. If you choose for the latter option add a statement such as ... 
-" execute source ~/vim/myVimFiles/ToggleCommentify.vim	|" DO PUT source ... vim BETWEEN DOUBLE QUOTES !!)
-" ... to your .vimrc file 
-" To call the functions add the following mappings in your .vimrc. 
-" map <M-c> :call ToggleCommentify()<CR>j 
-" imap <M-c> <ESC>:call ToggleCommentify()<CR>j 
-" The nice thing about these mapping is that you don't have to select a visual block to comment 
-" ... just keep the ALT-key pressed down and tap on 'c' as often as you need. 
-
-" Note: some people have reported that <M-c> doesn't work for them ... try <\-c> instead.
-
-" [Feral:201/02@02:57] Old version; what I have been using (works great!) up
-" untill I got playing with this :) .. changes from when I downloaded from
-" vim.sf.net ... few more fileTypes recognised ... I think a bug fix with the
-" makefile file type (been a long while thought..).. changed how isCommented
-" is calcualted to accomidate longer commentsymbols.
-"function! ToggleCommentify(Style) " {{{
-"	let lineString = getline(".")
-"	" [Feral:201/02@01:15] But but I want to comment empty lines!
-""	if lineString != $									" don't comment empty lines
-"	let fileType = &ft								" finding out the file-type, and specifying the comment symbol
-"	" {{{ Supported file types each have an if here, look at 'vim' filetype as an example.
-"	" [Feral:201/02@01:17] ftf is my hypertext markup format. (which is to say txt with a few special chars)
-"	if fileType == 'ox' || fileType == 'cpp' || fileType == 'php' || fileType == 'java'
-"		let commentSymbol = '//'
-"	elseif fileType == 'vim'
-"		let commentSymbol = '"'
-"	elseif fileType == 'lisp' || fileType == 'scheme' || fileType == 'dosini'
-"		let commentSymbol = ';'
-"	elseif fileType == 'tex'
-"		let commentSymbol = '%'
-"	elseif fileType == 'caos'
-"		let commentSymbol = '*'
-"	elseif fileType == 'm4' || fileType == 'config' || fileType == 'automake'
-"		let commentSymbol = 'dnl '
-"	elseif fileType == 'python' || fileType == 'perl' || fileType == 'make' || fileType =~ '[^w]sh$' || fileType == 'tcl' || fileType == 'jproperties'
-"		let commentSymbol = '#'
-"	elseif fileType == 'vb' || fileType == 'aspvbs'
-"		let commentSymbol == "'"
-"	elseif fileType == 'plsql' || fileType == 'lua'
-"		let commentSymbol = '--'
-"	else
-""		execute 'echo "ToggleCommentify has not (yet) been implemented for this file-type"'
-""		let commentSymbol = ''
-""		execute 'echo "ToggleCommentify: Unknown filetype, defaulting to CPP style //"'
-"		echo "ToggleCommentify: Unknown filetype, defaulting to CPP style //"
-"		let commentSymbol = '//'
-"	endif
-"	" }}}
-"
-"	" [Feral:201/02@01:24] toggle the comment (what it was, and default)
-"	if a:Style == 'c'
-"		call Commentify(commentSymbol)
-"	elseif a:Style == 'u'
-"		call UnCommentify(commentSymbol)
-"	else
-"		let isCommented = strpart(lineString,0,strlen(commentSymbol) )		" FERAL: extract the first x chars of the line, where x is the width/length of the comment symbol.
-"		if isCommented == commentSymbol
-"			call UnCommentify(commentSymbol)			" if the line is already commented, uncomment
-"		else
-"			call Commentify(commentSymbol)				" if the line is uncommented, comment
-"		endif
-"	endif
-"
-""	endif
-"endfunction " }}}
-" }}}
-"
 " }}}
 
 
@@ -188,6 +116,10 @@ function s:FindCommentify() " {{{
 
 	if fileType == 'ox' || fileType == 'cpp' || fileType == 'php' || fileType == 'java'
 		let commentSymbol_L = '//'
+		let commentSymbol_R = ''
+	" [Feral:189/03@20:40] bnk (custom format)
+	elseif fileType == 'bnk'
+		let commentSymbol_L = 'X-'
 		let commentSymbol_R = ''
 	"[Feral:155/03@06:40] C#
 	elseif fileType == 'cs'
@@ -258,21 +190,7 @@ function s:FindCommentify() " {{{
 
 endfunction " }}}
 
-function s:DoCommentify(DaMode, DaOldCol, ...) " {{{
-	"[Feral:300/02@07:24] To work with the range param, just add in the LR
-	"sniplet, the LR.openfold sniplet and then add LR as the range to the
-	"below subistutes. (I don't want to test these changes now!) TODO!
-	"i.e. {{{
-"//"	let LR = a:firstline.",".a:lastline
-"//""	echo confirm(LR)
-"//"
-"//"	" expand folds (required), else :s will operate on the entire fold count
-"//"	"	times, with count being the number of lines in the fold.
-"//"	execute ":silent! ".LR."foldopen!"
-"//"
-"//"	silent! execute LR.':s/^\(FTE:.\{-}\)\s\+FTE:.*$/\1/'
-"//"	"
-"//" }}}
+function s:DoCommentify(DaMode, ...) " {{{
 
 	if(a:0 == 0)
 		execute s:FindCommentify()
@@ -285,20 +203,28 @@ function s:DoCommentify(DaMode, DaOldCol, ...) " {{{
 	endif
 
 	" [Feral:201/02@01:46] GATE: nothing to do if we have no comment symbol.
-	"[Feral:308/02@02:04] CommentSymbol_R is allowed to be blank so we only
+	" [Feral:308/02@02:04] CommentSymbol_R is allowed to be blank so we only
 	"	check CommentSymbol_L
 	if strlen(CommentSymbol_L) == 0
 		return
 	endif
 
-"	echo confirm(a:DaMode."\n".a:DaOldCol."\n".CommentSymbol_L)
-
 
 	" Save where we are
-	let SavedMark = line('.').'G'.a:DaOldCol.'|'
+	let SavedMark = line('.') . 'G'.b:FTCSaveCol.'|'
 	normal! H
 	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
+	if has('folding')
+		let SavedMark = SavedMark.'zN'
+	endif
 	execute SavedMark
+
+	" [Feral:201/02@03:43] folded lines must be opend because a substitute
+	" operation on a fold effects all lines of the fold.
+	" temp turn off folding.
+	if has('folding')
+		normal! zn
+	endif
 
 
 
@@ -311,14 +237,6 @@ function s:DoCommentify(DaMode, DaOldCol, ...) " {{{
 
 
 
-	" [Feral:201/02@03:43] folded lines must be opend because a substitute
-	" operation on a fold effects all lines of the fold. When called from a
-	" range the result is that the lines of the fold have the substitute
-	" command executed on them as many times as there is folded lines.
-	" So, as a HACK if there is a fold, open it.
-	if(foldclosed(line(".")) != -1)
-		:foldopen
-	endif
 
 	let lineString = getline(".")
 	" FERAL: extract the first x chars of the line, where x is the width/length of the comment symbol.
@@ -342,12 +260,20 @@ function s:DoCommentify(DaMode, DaOldCol, ...) " {{{
 
 	let CommentSymbol_L = escape(CommentSymbol_L, '/\\*')
 	let CommentSymbol_R = escape(CommentSymbol_R, '/\\*')
-	set nohlsearch
+	let MessWith_HLS = 0
+	if &hlsearch
+		let MessWith_HLS = 1
+		set nohlsearch
+	endif
 	if ModeOfOperation == 2
 		" Uncomment -- remove the comment markers.
-		silent execute ':s/^'.CommentSymbol_L.'//'
+"		silent execute ':s/^'.CommentSymbol_L.'//'
+" [Feral:193/03@09:07] But don't scream if the comment char isn't there.
+		silent execute ':s/^'.CommentSymbol_L.'//e'
 		if strlen(CommentSymbol_R)
-			silent execute ':s/'.CommentSymbol_R.'$//'
+"			silent execute ':s/'.CommentSymbol_R.'$//'
+" [Feral:193/03@09:07] But don't scream if the comment char isn't there.
+			silent execute ':s/'.CommentSymbol_R.'$//e'
 		endif
 	else
 		" else ModeOfOperation == 1
@@ -357,12 +283,109 @@ function s:DoCommentify(DaMode, DaOldCol, ...) " {{{
 			silent execute ':s/$/'.CommentSymbol_R.'/'
 		endif
 	endif
-	set hlsearch
+	if MessWith_HLS
+		let MessWith_HLS = 0
+		set hlsearch
+	endif
 
 
 	" Return to where we were
 	execute SavedMark
-	unlet SavedMark
+
+endfunction
+" }}}
+
+function s:DLAC(...) range " {{{
+
+	if(a:0 == 0)
+		execute s:FindCommentify()
+	elseif a:0 == 2
+		let CommentSymbol_L = a:1
+		let CommentSymbol_R = a:2
+	else
+		let CommentSymbol_L = a:1
+		let CommentSymbol_R = ""
+	endif
+
+	" [Feral:201/02@01:46] GATE: nothing to do if we have no comment symbol.
+	" [Feral:308/02@02:04] CommentSymbol_R is allowed to be blank so we only
+	"	check CommentSymbol_L
+	if strlen(CommentSymbol_L) == 0
+		return
+	endif
+
+
+	" Save where we are
+	let SavedMark = line('.') . 'G'.b:FTCSaveCol.'|'
+	normal! H
+	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
+	if has('folding')
+		let SavedMark = SavedMark.'zN'
+	endif
+	execute SavedMark
+
+	" [Feral:201/02@03:43] folded lines must be opend because a substitute
+	" operation on a fold effects all lines of the fold.
+	" temp turn off folding.
+	if has('folding')
+		normal! zn
+	endif
+
+
+
+	let CommentSymbol_L = escape(CommentSymbol_L, '/\\*')
+	let CommentSymbol_R = escape(CommentSymbol_R, '/\\*')
+	let MessWith_HLS = 0
+	if &hlsearch
+		let MessWith_HLS = 1
+		set nohlsearch
+	endif
+
+
+	let SR = a:firstline.",".a:lastline
+
+	" Set report option to a huge value to prevent informations messages
+	" while deleting the lines
+	let old_report = &report
+	set report=99999
+
+	let Was_Reg_w = @w
+	":[range]y[ank] [x]	Yank [range] lines [into register x].
+	execute ":".SR."yank w"
+
+	" Restore the report option
+	let &report = old_report
+
+	put! w
+	let @w=Was_Reg_w
+
+
+
+	" Set report option to a huge value to prevent informations messages
+	" while deleting the lines
+	let old_report = &report
+	set report=99999
+
+	" Comment -- add the comment markers.
+	silent execute SR.':s/^/'.CommentSymbol_L.'/'
+	if strlen(CommentSymbol_R)
+		silent execute SR.':s/$/'.CommentSymbol_R.'/'
+	endif
+
+
+	" Restore the report option
+	let &report = old_report
+
+	if MessWith_HLS
+		let MessWith_HLS = 0
+		set hlsearch
+	endif
+
+	" Return to where we were
+	execute SavedMark
+	" but goto to the new duplicate lines
+	execute ":".(a:lastline+1)
+
 endfunction
 " }}}
 
@@ -375,16 +398,17 @@ endfunction
 ":command -nargs=? -range UC :<line1>,<line2>call <SID>UnCommentify(<f-args>)
 "}}}
 if !exists(":TC")
-	:command -nargs=? -range TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, b:FTCSaveCol, <f-args>)|:unlet b:FTCSaveCol
+	:command -nargs=? -range TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, <f-args>)
 endif
 if !exists(":CC")
-	:command -nargs=? -range CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, b:FTCSaveCol, <f-args>)|:unlet b:FTCSaveCol
+	:command -nargs=? -range CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, <f-args>)
 endif
 if !exists(":UC")
-	:command -nargs=? -range UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, b:FTCSaveCol, <f-args>)|:unlet b:FTCSaveCol
+	:command -nargs=? -range UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, <f-args>)
 endif
 
-if !hasmapto('<Plug>FtcTc') && mapcheck("<M-c>", "nvi") == ""
+"if !hasmapto('<Plug>FtcTc') && mapcheck("<M-c>", "nvi") == ""
+if !hasmapto('<Plug>FtcTc')
 	nmap <unique>	<M-c>	<Plug>FtcTc
 	vmap <unique>	<M-c>	<Plug>FtcTc
 	imap <unique>	<M-c>	<esc><Plug>FtcTc
@@ -393,26 +417,36 @@ noremap <unique> <script> <Plug>FtcTc  :TC<CR>j
 
 
 
-"[Feral:317/02@05:40] This is basicaly a hack; hopefully I'll COMBAK to this
-"	someday and clean it up. (there is no reason for a <plug> to rely on the
-"	:commands the script defines for example)
-" DLAC -- duplicate line(s) and comment.
-" Mangles mark z
-if exists(":CC") && exists(":UC")
-	if !hasmapto('<Plug>FtcDlacNormal') && mapcheck("<C-c>", "n") == ""
-		" Normal Same keys as Multi-Edit, fwiw.
-		"[Feral:314/02@19:28] Save shift is not recognised; these come out as
-		"	<C-c>, dern!
-		nmap <unique>	<C-c>	<plug>FtcDlacNormal
-	endif
-	if !hasmapto('<Plug>FtcDlacVisual') && mapcheck("<C-c>", "v") == ""
-		" visual maping to handle multiple lines...
-		vmap <unique>	<C-c>	<plug>FtcDlacVisual
-	endif
+""[Feral:317/02@05:40] This is basicaly a hack; hopefully I'll COMBAK to this
+""	someday and clean it up. (there is no reason for a <plug> to rely on the
+""	:commands the script defines for example)
+"" DLAC -- duplicate line(s) and comment.
+"" Mangles mark z
+"if exists(":CC") && exists(":UC")
+"	if !hasmapto('<Plug>FtcDlacNormal') && mapcheck("<C-c>", "n") == ""
+"		" Normal Same keys as Multi-Edit, fwiw.
+"		"[Feral:314/02@19:28] Save shift is not recognised; these come out as
+"		"	<C-c>, dern!
+"		nmap <unique>	<C-c>	<plug>FtcDlacNormal
+"	endif
+"	if !hasmapto('<Plug>FtcDlacVisual') && mapcheck("<C-c>", "v") == ""
+"		" visual maping to handle multiple lines...
+"		vmap <unique>	<C-c>	<plug>FtcDlacVisual
+"	endif
+"
+"	noremap		<unique> <script> <Plug>FtcDlacNormal	mzyyp`z:CC<CR>j
+"	vnoremap	<unique> <script> <Plug>FtcDlacVisual	mz:CC<cr>gvyPgv:UC<CR>`z
+"endif
 
-	noremap		<unique> <script> <Plug>FtcDlacNormal	mzyyp`z:CC<CR>j
-	vnoremap	<unique> <script> <Plug>FtcDlacVisual	mz:CC<cr>gvyPgv:UC<CR>`z
+:command -nargs=? -range DLAC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DLAC(<f-args>)
+if !hasmapto('<Plug>FtcDLAC')
+	nmap <unique>	<C-c>	<Plug>FtcDLAC
+	vmap <unique>	<C-c>	<Plug>FtcDLAC
+	imap <unique>	<C-c>	<esc><Plug>FtcDLAC
 endif
+noremap <unique> <script> <Plug>FtcDLAC  :DLAC<cr>
+
+
 
 " }}}
 
