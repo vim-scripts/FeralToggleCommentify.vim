@@ -2,12 +2,11 @@
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
 " \file		feraltogglecommentify.vim
-" \date		Sat, 12 Jul 2003 10:41 PDT
+" \date		Wed, 16 Jul 2003 17:48 PDT
 "
-" \brief	Adds, removes or toggles comment characters on col1 at the touch
-"			of a key. Ranges are supported as are custom text to
-"			insert/remove/toggle.
-" Maintainer: (of this version anyway)
+" \brief	Adds, removes or toggles comment characters. Ranges are supported
+"			as is custom text to insert/remove/toggle.
+" Maintainer: (same as \author below)
 " \author	Robert KellyIV <Sreny@SverGbc.Pbz> (Rot13ed)
 " Based On: {{{
 " \note		Based On Vincent Nijs's ToggleCommentify.vim v1.2 Last Change:
@@ -25,11 +24,20 @@
 "			URL:	http://vim.sourceforge.net/scripts/script.php?script_id=665
 " Contrabutions From: {{{
 "	Bernhard Wagner		(12-Nov-2002 xml changes)
+"	Jörn Horstmann.		Changes are marked with "JH:". -- Also inspired the
+"						v1.55 options.
 " }}}
 "
 " \version	$Id$
-" Version:	1.54
+" Version:	1.55
 " History: {{{
+"	[Feral:196/03@07:30] 1.55
+"	Integrating changes from Jörn Horstmann. Changes are marked with "JH:".
+"	Improvement:	Added options to determine how this should react.
+"		* Optionally does not mess with blank lines.
+"		* Change by JH, comment does not have to be in first column
+"		* Change by JH, only add comment when not already commented
+"		Please see "Customizing:" for details and usage:
 "	[Feral:193/03@09:08] 1.54
 "	BUG FIX:		(minor) no longer complains when uncommenting and there
 "		are no comment char(s). (aka middle of a range is uncommented already)
@@ -89,9 +97,49 @@
 "
 " }}}
 "
-" Note:		If someone wants this to not work on blank lines or has comment
-"			strings or any other suggestions just email me and I'll look into
-"			it.
+" Customizing: (how to customize) {{{
+"
+"	Each option var can be specified as buffer or global, with that
+"	precedence.
+"
+"	I.e. in .vimrc:
+"	let g:FTCOperateOnFirstColumnOnly = 0
+"	let g:FTCOperateOnlyOnNonComments = 1
+"
+"	Option: g:FTCOperateOnFirstColumnOnly
+"		If this is 0 (false) then the comment char does not have to be at col1
+"		to be removed, in addition comment chars are placed just before the
+"		first word of the line.
+"		Valid Values: 0 or 1
+"		Default: 1
+"
+"	Option: g:FTCOperateOnlyOnNonComments
+"		If 1 (true) a line will not be commented if it already starts with
+"		comment chars. With this 0 (false) you can (easily) comment entire
+"		functions without fear of messing up commenting (i.e. '<,'>CC ...
+"		'<,'>UC ...  I.e. comment then uncomment. If this is true the above
+"		MAY not work (depending on how the existing comments are.)
+"		Valid Values: 0 or 1
+"		Default: 0
+"
+"	Option: g:FTCOperateOnBlankLines
+"		If 1 (true) blank lines will be processed, else they are skipped.
+"		Valid Values: 0 or 1
+"		Default: 1
+"
+"	Option: g:FTCBangEffectsWhat
+"		Will toggle an option if command is banged: (i.e. :CC!)
+"			1. OperateOnFirstColumnOnly
+"			2. OperateOnlyOnNonComments
+"			3. OperateOnBlankLines
+"		Valid Values: 1, 2 or 3
+"		Default: 1
+"
+"
+" }}}
+"
+" Note:		I am happy to add new file types or any other suggestions just
+"			email me and I'll see what I can do.
 "
 " Examples:
 "	:CC--
@@ -176,12 +224,13 @@ function s:FindCommentify() " {{{
 		let commentSymbol_L = '--'
 		let commentSymbol_R = ''
 	else
-		execute 'echo "ToggleCommentify has not (yet) been implemented for this file-type"'
+		echohl WarningMsg
+		echo "feraltogglecommentify.vim has not (yet) implemented for this file-type"
+		echo "Your best bet is to specify the comment chars manually, i.e. :CC --"
+		echo "Please feel free to email me with the comment char(s) and file type."
+		echohl None
 		let commentSymbol_L = ''
 		let commentSymbol_R = ''
-"		echo "ToggleCommentify: Unknown filetype, defaulting to CPP style //"
-"		let commentSymbol_L = '//'
-"		let commentSymbol_R = ''
 	endif
 
 	" this function is ment to be executed as a way of returning two vars; see
@@ -190,8 +239,10 @@ function s:FindCommentify() " {{{
 
 endfunction " }}}
 
-function s:DoCommentify(DaMode, ...) " {{{
+function s:DoCommentify(DaMode, DaBang, ...) " {{{
 
+	" Initialize: CommentSymbol_L, CommentSymbol_R
+	" {{{
 	if(a:0 == 0)
 		execute s:FindCommentify()
 	elseif a:0 == 2
@@ -201,12 +252,109 @@ function s:DoCommentify(DaMode, ...) " {{{
 		let CommentSymbol_L = a:1
 		let CommentSymbol_R = ""
 	endif
+	" }}}
 
 	" [Feral:201/02@01:46] GATE: nothing to do if we have no comment symbol.
-	" [Feral:308/02@02:04] CommentSymbol_R is allowed to be blank so we only
-	"	check CommentSymbol_L
+	" CommentSymbol_R is allowed to be blank so we only check CommentSymbol_L
 	if strlen(CommentSymbol_L) == 0
 		return
+	endif
+
+
+	" Initialize: OperateOnFirstColumnOnly
+	" {{{
+	" If this is false (0) then the comment char does not have to be at col1
+	" to be removed. Added comment chars are placed just before the first word
+	" of the line.
+	if exists('b:FTCOperateOnFirstColumnOnly')
+		let OperateOnFirstColumnOnly = b:FTCOperateOnFirstColumnOnly
+	elseif exists('g:FTCOperateOnFirstColumnOnly')
+		let OperateOnFirstColumnOnly = g:FTCOperateOnFirstColumnOnly
+	else
+		let OperateOnFirstColumnOnly = 1
+		"let OperateOnFirstColumnOnly = 0
+	endif
+	" }}}
+
+	" Initialize: OperateOnlyOnNonComments
+	" {{{
+	" If true a line will not be commented if it already starts with comment
+	" chars. With this false you can (easily) comment entire functions without
+	" fear of messing up commenting (i.e. '<,'>CC ... '<,'>UC ... I.e. comment
+	" then uncomment. If this is true the above MAY not work (depending on how
+	" the existing comments are.)
+	if exists('b:FTCOperateOnlyOnNonComments')
+		let OperateOnlyOnNonComments = b:FTCOperateOnlyOnNonComments
+	elseif exists('g:FTCOperateOnlyOnNonComments')
+		let OperateOnlyOnNonComments = g:FTCOperateOnlyOnNonComments
+	else
+		"let OperateOnlyOnNonComments = 1
+		let OperateOnlyOnNonComments = 0
+	endif
+	" }}}
+
+	" Initialize: OperateOnBlankLines
+	" {{{
+	" If true blank lines will be processed, else they are skipped.
+	if exists('b:FTCOperateOnBlankLines')
+		let OperateOnBlankLines = b:FTCOperateOnBlankLines
+	elseif exists('g:FTCOperateOnBlankLines')
+		let OperateOnBlankLines = g:FTCOperateOnBlankLines
+	else
+		let OperateOnBlankLines = 1
+		"let OperateOnBlankLines = 0
+	endif
+	" }}}
+
+	" Initialize: BangEffectsWhat
+	" {{{
+	" Will toggle an option if command is banded:
+	"	1. OperateOnFirstColumnOnly
+	"	2. OperateOnlyOnNonComments
+	"	3. OperateOnBlankLines
+	if exists('b:FTCBangEffectsWhat')
+		let BangEffectsWhat = b:FTCBangEffectsWhat
+	elseif exists('g:FTCBangEffectsWhat')
+		let BangEffectsWhat = g:FTCBangEffectsWhat
+	else
+		let BangEffectsWhat = 1
+	endif
+	" }}}
+
+	" [Feral:196/03@15:57] Bang will toggle options.
+	if a:DaBang == "!"
+
+		if BangEffectsWhat == 1
+			if OperateOnFirstColumnOnly == 0
+				let OperateOnFirstColumnOnly = 1
+			else
+				let OperateOnFirstColumnOnly = 0
+			endif
+		elseif BangEffectsWhat == 2
+			if OperateOnlyOnNonComments == 0
+				let OperateOnlyOnNonComments = 1
+			else
+				let OperateOnlyOnNonComments = 0
+			endif
+		elseif BangEffectsWhat == 3
+			if OperateOnBlankLines == 0
+				let OperateOnBlankLines = 1
+			else
+				let OperateOnBlankLines = 0
+			endif
+		else
+			echohl ErrorMsg
+			echo "feraltogglecommentify.vim ERROR:"
+			echo "FTCBangEffectsWhat set to an invalid value; please fix."
+			echo "Quick Help:"
+			echo "let g:FTCBangEffectsWhat = 1. for OperateOnFirstColumnOnly"
+			echo "let g:FTCBangEffectsWhat = 2. for OperateOnlyOnNonComments"
+			echo "let g:FTCBangEffectsWhat = 3. for OperateOnBlankLines"
+			echo "Aborting."
+			echohl None
+			return
+		endif
+
 	endif
 
 
@@ -220,27 +368,43 @@ function s:DoCommentify(DaMode, ...) " {{{
 	execute SavedMark
 
 	" [Feral:201/02@03:43] folded lines must be opend because a substitute
-	" operation on a fold effects all lines of the fold.
-	" temp turn off folding.
+	" operation on a fold effects all lines of the fold, so (temp) turn off
+	" folding.
 	if has('folding')
 		normal! zn
 	endif
 
 
-
-"	" [Feral:201/02@01:15] I want to comment empty lines so this is remed out.
-"	let IsBlankLineString = getline(".")
-"	if IsBlankLineString != $
-"		" don't comment empty lines
-"		return
-"	endif
-
-
-
-
 	let lineString = getline(".")
-	" FERAL: extract the first x chars of the line, where x is the width/length of the comment symbol.
-	let isCommented = strpart(lineString,0,strlen(CommentSymbol_L) )
+
+	" [Feral:196/03@14:31] I could place the if OperateOnFirstColumnOnly here
+	" just as easily; then we would bail on lines that just contained
+	" whitespace as well as empty lines.
+
+	if OperateOnBlankLines == 0
+		if lineString == $
+			" the line is blank, do nothing.
+			" Return to where we were
+			execute SavedMark
+			return
+		endif
+	endif
+
+
+
+	if OperateOnFirstColumnOnly == 0
+		" JH: remove leading white space
+		let lineString = substitute(lineString,'^\s*','','e')
+	endif
+
+	" FERAL: extract the first x chars of the line, where x is the
+	" width/length of the comment symbol and see if they match our Left
+	" comment symbol.
+	if strpart(lineString,0,strlen(CommentSymbol_L) ) == CommentSymbol_L
+		let isCommented = 0
+	else
+		let isCommented = 1
+	endif
 
 
 	" 0 = toggle
@@ -249,7 +413,8 @@ function s:DoCommentify(DaMode, ...) " {{{
 "	if a:DaMode == 1
 	let ModeOfOperation = a:DaMode
 	if ModeOfOperation == 0
-		if isCommented == CommentSymbol_L
+		" Toggle:
+		if isCommented == 0
 			" already commented, so uncomment.
 			let ModeOfOperation = 2
 		else
@@ -266,21 +431,42 @@ function s:DoCommentify(DaMode, ...) " {{{
 		set nohlsearch
 	endif
 	if ModeOfOperation == 2
-		" Uncomment -- remove the comment markers.
-"		silent execute ':s/^'.CommentSymbol_L.'//'
-" [Feral:193/03@09:07] But don't scream if the comment char isn't there.
-		silent execute ':s/^'.CommentSymbol_L.'//e'
+		" Uncomment: -- remove the comment markers.
+		" [Feral:193/03@09:07] But don't scream if the comment char isn't
+		"	there.
+		if OperateOnFirstColumnOnly == 1
+			silent execute ':sm/^'.CommentSymbol_L.'//e'
+		else
+			" JH: comment symbol is not always on the first column
+			silent execute ':sm/^\(\s*\)'.CommentSymbol_L.'/\1/e'
+		endif
+
 		if strlen(CommentSymbol_R)
-"			silent execute ':s/'.CommentSymbol_R.'$//'
-" [Feral:193/03@09:07] But don't scream if the comment char isn't there.
-			silent execute ':s/'.CommentSymbol_R.'$//e'
+			silent execute ':sm/'.CommentSymbol_R.'$//e'
 		endif
 	else
-		" else ModeOfOperation == 1
-		" Comment -- add the comment markers.
-		silent execute ':s/^/'.CommentSymbol_L.'/'
-		if strlen(CommentSymbol_R)
-			silent execute ':s/$/'.CommentSymbol_R.'/'
+"		" else ModeOfOperation == 1
+"		" Comment: -- add the comment markers.
+		" JH: only add comment when not already commented
+		let DoIt = 0
+		if OperateOnlyOnNonComments == 0
+			let DoIt = 1
+		else
+			if isCommented == 1
+				let DoIt = 1
+			endif
+		endif
+
+		if DoIt == 1
+			if OperateOnFirstColumnOnly == 1
+				silent execute ':sm/^/'.CommentSymbol_L.'/'
+			else
+				silent execute ':sm/^\(\s*\)/\1'.CommentSymbol_L.'/'
+			endif
+
+			if strlen(CommentSymbol_R)
+				silent execute ':sm/$/'.CommentSymbol_R.'/'
+			endif
 		endif
 	endif
 	if MessWith_HLS
@@ -361,15 +547,15 @@ function s:DLAC(...) range " {{{
 
 
 
-	" Set report option to a huge value to prevent informations messages
-	" while deleting the lines
+	" Set report option to a huge value to prevent informative messages while
+	" deleting the lines
 	let old_report = &report
 	set report=99999
 
 	" Comment -- add the comment markers.
-	silent execute SR.':s/^/'.CommentSymbol_L.'/'
+	silent execute SR.':sm/^/'.CommentSymbol_L.'/'
 	if strlen(CommentSymbol_R)
-		silent execute SR.':s/$/'.CommentSymbol_R.'/'
+		silent execute SR.':sm/$/'.CommentSymbol_R.'/'
 	endif
 
 
@@ -398,13 +584,13 @@ endfunction
 ":command -nargs=? -range UC :<line1>,<line2>call <SID>UnCommentify(<f-args>)
 "}}}
 if !exists(":TC")
-	:command -nargs=? -range TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, <f-args>)
+	:command -nargs=? -range -bang TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, <q-bang>, <f-args>)
 endif
 if !exists(":CC")
-	:command -nargs=? -range CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, <f-args>)
+	:command -nargs=? -range -bang CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, <q-bang>, <f-args>)
 endif
 if !exists(":UC")
-	:command -nargs=? -range UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, <f-args>)
+	:command -nargs=? -range -bang UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, <q-bang>, <f-args>)
 endif
 
 "if !hasmapto('<Plug>FtcTc') && mapcheck("<M-c>", "nvi") == ""
@@ -417,6 +603,7 @@ noremap <unique> <script> <Plug>FtcTc  :TC<CR>j
 
 
 
+" {{{ HOLDING: Old dlac mapping
 ""[Feral:317/02@05:40] This is basicaly a hack; hopefully I'll COMBAK to this
 ""	someday and clean it up. (there is no reason for a <plug> to rely on the
 ""	:commands the script defines for example)
@@ -437,12 +624,13 @@ noremap <unique> <script> <Plug>FtcTc  :TC<CR>j
 "	noremap		<unique> <script> <Plug>FtcDlacNormal	mzyyp`z:CC<CR>j
 "	vnoremap	<unique> <script> <Plug>FtcDlacVisual	mz:CC<cr>gvyPgv:UC<CR>`z
 "endif
-
+" }}}
 :command -nargs=? -range DLAC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DLAC(<f-args>)
 if !hasmapto('<Plug>FtcDLAC')
 	nmap <unique>	<C-c>	<Plug>FtcDLAC
 	vmap <unique>	<C-c>	<Plug>FtcDLAC
-	imap <unique>	<C-c>	<esc><Plug>FtcDLAC
+" [Feral:194/03@07:08] Collision, See: i_CTRL-C
+"	imap <unique>	<C-c>	<esc><Plug>FtcDLAC
 endif
 noremap <unique> <script> <Plug>FtcDLAC  :DLAC<cr>
 
