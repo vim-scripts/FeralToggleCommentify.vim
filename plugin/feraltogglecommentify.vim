@@ -2,7 +2,7 @@
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
 " \file		feraltogglecommentify.vim
-" \date		Mon, 21 Jul 2003 13:32 PDT
+" \date		Tue, 19 Aug 2003 11:31 PDT
 "
 " \brief	Adds, removes or toggles comment characters. Ranges are supported
 "			as is custom text to insert/remove/toggle.
@@ -23,14 +23,19 @@
 " \note		This is VIMSCRIPT#665 (now):
 "			URL:	http://vim.sourceforge.net/scripts/script.php?script_id=665
 " Contrabutions From: {{{
+"	Brett Williams		v1.57 ruby change.
 "	Bernhard Wagner		(12-Nov-2002 xml changes)
 "	Jörn Horstmann.		Changes are marked with "JH:". -- Also inspired the
 "						v1.55 options.
 " }}}
 "
-" \version	$Id$
-" Version:	1.56
+" \version	$Id: FeralToggleCommentify.vim,v 1.9 2003/08/02 09:33:13 root Exp $
+" Version:	1.57
 " History: {{{
+"	[Feral:231/03@09:45] 1.57
+"	Improvement:	Added ruby '#' comment type, contribution by Brett
+"		Williams
+"					Added sh '#' comment type.
 "	[Feral:202/03@13:31] 1.56
 "	BUG FIX:		Fixed silly cursor restore problem, screen no longer jumps
 "		on occasion.
@@ -159,6 +164,9 @@ if exists("loaded_feraltogglecommentify")
 endif
 let loaded_feraltogglecommentify = 1
 
+let s:save_cpo = &cpo
+set cpo&vim
+"set cpo+=C
 
 " Look to the vim entry here to add your own file types.
 function s:FindCommentify() " {{{
@@ -167,6 +175,11 @@ function s:FindCommentify() " {{{
 
 	if fileType == 'ox' || fileType == 'cpp' || fileType == 'php' || fileType == 'java'
 		let commentSymbol_L = '//'
+		let commentSymbol_R = ''
+	" [Feral:224/03@17:08] conf (.xinitrc, etc.)
+	" [Feral:231/03@09:45] ruby contribution by Brett Williams
+	elseif fileType == 'python' || fileType == 'perl' || fileType == 'make' || fileType =~ '[^w]sh$' || fileType == 'tcl' || fileType == 'jproperties' || fileType == 'ruby' || fileType == 'sh' || fileType == 'conf'
+		let commentSymbol_L = '#'
 		let commentSymbol_R = ''
 	" [Feral:189/03@20:40] bnk (custom format)
 	elseif fileType == 'bnk'
@@ -216,9 +229,6 @@ function s:FindCommentify() " {{{
 		let commentSymbol_R = ''
 	elseif fileType == 'm4' || fileType == 'config' || fileType == 'automake'
 		let commentSymbol_L = 'dnl '
-		let commentSymbol_R = ''
-	elseif fileType == 'python' || fileType == 'perl' || fileType == 'make' || fileType =~ '[^w]sh$' || fileType == 'tcl' || fileType == 'jproperties'
-		let commentSymbol_L = '#'
 		let commentSymbol_R = ''
 	elseif fileType == 'vb' || fileType == 'aspvbs'
 		let commentSymbol_L == "'"
@@ -644,4 +654,5 @@ noremap <unique> <script> <Plug>FtcDLAC  :DLAC<cr>
 
 " }}}
 
+let &cpo = s:save_cpo
 "End of file
