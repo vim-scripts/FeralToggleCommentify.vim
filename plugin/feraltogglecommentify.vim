@@ -2,7 +2,7 @@
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
 " \file		feraltogglecommentify.vim
-" \date		Tue, 19 Aug 2003 11:31 PDT
+" \date		Thu, 28 Aug 2003 00:46 PDT
 "
 " \brief	Adds, removes or toggles comment characters. Ranges are supported
 "			as is custom text to insert/remove/toggle.
@@ -23,6 +23,7 @@
 " \note		This is VIMSCRIPT#665 (now):
 "			URL:	http://vim.sourceforge.net/scripts/script.php?script_id=665
 " Contrabutions From: {{{
+"	Tim Johnson			v1.58 rebol change.
 "	Brett Williams		v1.57 ruby change.
 "	Bernhard Wagner		(12-Nov-2002 xml changes)
 "	Jörn Horstmann.		Changes are marked with "JH:". -- Also inspired the
@@ -30,8 +31,10 @@
 " }}}
 "
 " \version	$Id: FeralToggleCommentify.vim,v 1.9 2003/08/02 09:33:13 root Exp $
-" Version:	1.57
+" Version:	1.58
 " History: {{{
+"	[Feral:240/03@00:31] 1.58
+"	Improvement:	Added rebol ';' comment type, contribution by Tim Johnson
 "	[Feral:231/03@09:45] 1.57
 "	Improvement:	Added ruby '#' comment type, contribution by Brett
 "		Williams
@@ -173,7 +176,11 @@ function s:FindCommentify() " {{{
 	" finding out the file-type, and specifying the comment symbol
 	let fileType = &ft
 
-	if fileType == 'ox' || fileType == 'cpp' || fileType == 'php' || fileType == 'java'
+	"[Feral:201/02@01:17] ftf is my hypertext markup format. (which is to say
+	"	txt with a few special chars)
+	"[Feral:283/02@04:14] torque-script: See: http://www.garagegames.com/
+	"[Feral:155/03@06:40] C# ('cs')
+	if fileType == 'ox' || fileType == 'cpp' || fileType == 'php' || fileType == 'java' || fileType == 'cs' || fileType == 'ftf' || fileType == 'torquescript' || fileType == 'pov'
 		let commentSymbol_L = '//'
 		let commentSymbol_R = ''
 	" [Feral:224/03@17:08] conf (.xinitrc, etc.)
@@ -184,19 +191,6 @@ function s:FindCommentify() " {{{
 	" [Feral:189/03@20:40] bnk (custom format)
 	elseif fileType == 'bnk'
 		let commentSymbol_L = 'X-'
-		let commentSymbol_R = ''
-	"[Feral:155/03@06:40] C#
-	elseif fileType == 'cs'
-		let commentSymbol_L = '//'
-		let commentSymbol_R = ''
-	"[Feral:201/02@01:17] ftf is my hypertext markup format. (which is to say
-	"	txt with a few special chars)
-	elseif fileType == 'ftf'
-		let commentSymbol_L = '//'
-		let commentSymbol_R = ''
-	"[Feral:283/02@04:14] torque-script: See: http://www.garagegames.com/
-	elseif fileType == 'torquescript'
-		let commentSymbol_L = '//'
 		let commentSymbol_R = ''
 	"[Feral:303/02@19:20] fte is a template expansion system, See:
 	"	http://vim.sourceforge.net/scripts/script.php?script_id=648
@@ -211,14 +205,11 @@ function s:FindCommentify() " {{{
 	elseif fileType == 'c' || fileType == "css"
 		let commentSymbol_L = '/*'
 		let commentSymbol_R = '*/'
-	" The rest...
-	elseif fileType == 'pov'
-		let commentSymbol_L = '//'
-		let commentSymbol_R = ''
 	elseif fileType == 'vim'
 		let commentSymbol_L = '"'
 		let commentSymbol_R = ''
-	elseif fileType == 'lisp' || fileType == 'scheme' || fileType == 'dosini'
+	" [Feral:240/03@00:33] rebol contribution from Tim Johnson
+	elseif fileType == 'lisp' || fileType == 'scheme' || fileType == 'dosini' || fileType == 'rebol'
 		let commentSymbol_L = ';'
 		let commentSymbol_R = ''
 	elseif fileType == 'tex'
