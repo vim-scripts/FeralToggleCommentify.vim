@@ -2,12 +2,12 @@
 "	vim:ff=unix ts=4 ss=4
 "	vim60:fdm=marker
 " \file		feraltogglecommentify.vim
-" \date		Thu, 28 Aug 2003 00:46 PDT
+" \date		Thu, 28 Apr 2005 16:22 PST
 "
 " \brief	Adds, removes or toggles comment characters. Ranges are supported
 "			as is custom text to insert/remove/toggle.
 " Maintainer: (same as \author below)
-" \author	Robert KellyIV <Sreny@SverGbc.Pbz> (Rot13ed)
+" \author	Robert KellyIV <sreny@srenyqernzf.pbz> (Rot13ed)
 " Based On: {{{
 " \note		Based On Vincent Nijs's ToggleCommentify.vim v1.2 Last Change:
 "			Sunday, June 9th, 2001 (VIMSCRIPT#4)
@@ -17,11 +17,11 @@
 " \author	Meikel Brandmeyer <Brandels_Mikesh@web.de>
 " }}}
 " \note		This was VIMSCRIPT#4: (originally; See next note)
-"			URL:	http://vim.sourceforge.net/script.php?script_id=4
+"			URL:	<URL:http://vim.sourceforge.net/script.php?script_id=4>
 "			I am unable to UL new versions (reasonable, wasn't my script
 "			originally), so I'll make a new entry to keep updating this script
 " \note		This is VIMSCRIPT#665 (now):
-"			URL:	http://vim.sourceforge.net/scripts/script.php?script_id=665
+"			URL:	<URL:http://vim.sourceforge.net/scripts/script.php?script_id=665>
 " Contrabutions From: {{{
 "	Tim Johnson			v1.58 rebol change.
 "	Brett Williams		v1.57 ruby change.
@@ -30,9 +30,17 @@
 "						v1.55 options.
 " }}}
 "
-" \version	$Id: FeralToggleCommentify.vim,v 1.9 2003/08/02 09:33:13 root Exp $
-" Version:	1.58
+" Version:	1.611
 " History: {{{
+"	[Feral:118/05@16:20] 1.611
+"	*sigh* BUG fix with 1.61's cursor restore. col was messed up; Shame
+"	cursor() does not work with a virtcol.
+"	[Feral:118/05@13:51] 1.61
+"	Improved/Fixed cursor restore. Screen should not jump; ever.
+"	[Feral:284/03@21:54] 1.60
+"	Improvement:	Added muttrc '#'
+"	[Feral:241/03@01:16] 1.59
+"	Improvement:	Added xmodmap '!'
 "	[Feral:240/03@00:31] 1.58
 "	Improvement:	Added rebol ';' comment type, contribution by Tim Johnson
 "	[Feral:231/03@09:45] 1.57
@@ -185,7 +193,9 @@ function s:FindCommentify() " {{{
 		let commentSymbol_R = ''
 	" [Feral:224/03@17:08] conf (.xinitrc, etc.)
 	" [Feral:231/03@09:45] ruby contribution by Brett Williams
-	elseif fileType == 'python' || fileType == 'perl' || fileType == 'make' || fileType =~ '[^w]sh$' || fileType == 'tcl' || fileType == 'jproperties' || fileType == 'ruby' || fileType == 'sh' || fileType == 'conf'
+	" [Feral:242/03@23:43] xf86conf (/etc/X11/XF86Config)
+	" [Feral:284/03@21:54] muttrc
+	elseif fileType == 'python' || fileType == 'perl' || fileType == 'make' || fileType =~ '[^w]sh$' || fileType == 'tcl' || fileType == 'jproperties' || fileType == 'ruby' || fileType == 'sh' || fileType == 'conf' || fileType == 'xf86conf' || fileType == 'muttrc'
 		let commentSymbol_L = '#'
 		let commentSymbol_R = ''
 	" [Feral:189/03@20:40] bnk (custom format)
@@ -226,6 +236,9 @@ function s:FindCommentify() " {{{
 		let commentSymbol_R = ''
 	elseif fileType == 'plsql' || fileType == 'lua'
 		let commentSymbol_L = '--'
+		let commentSymbol_R = ''
+	elseif fileType == 'xmodmap'
+		let commentSymbol_L = '!'
 		let commentSymbol_R = ''
 	else
 		echohl WarningMsg
@@ -362,24 +375,27 @@ function s:DoCommentify(DaMode, DaBang, ...) " {{{
 	endif
 
 
-	" Save where we are
-	let SavedMark = line('.').'G'.b:FTCSaveCol.'|'
-	normal! H
-"	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
-	let SavedMark = line('.').'Gzt'.SavedMark
-	if has('folding')
-		let SavedMark = 'zN'.SavedMark
-	endif
-	let SavedMark = 'normal! '.SavedMark
-	execute SavedMark
+"	" Save where we are
+"	let SavedMark = line('.').'G'.b:FTCSaveCol.'|'
+"	normal! H
+""	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
+"	let SavedMark = line('.').'Gzt'.SavedMark
+"	if has('folding')
+"		let SavedMark = 'zN'.SavedMark
+"	endif
+"	let SavedMark = 'normal! '.SavedMark
+"	execute SavedMark
+"
+"	" [Feral:201/02@03:43] folded lines must be opend because a substitute
+"	" operation on a fold effects all lines of the fold, so (temp) turn off
+"	" folding.
+"	if has('folding')
+"		normal! zn
+"	endif
 
 
-	" [Feral:201/02@03:43] folded lines must be opend because a substitute
-	" operation on a fold effects all lines of the fold, so (temp) turn off
-	" folding.
-	if has('folding')
-		normal! zn
-	endif
+
+
 
 
 	let lineString = getline(".")
@@ -391,11 +407,28 @@ function s:DoCommentify(DaMode, DaBang, ...) " {{{
 	if OperateOnBlankLines == 0
 		if lineString == $
 			" the line is blank, do nothing.
-			" Return to where we were
-			execute SavedMark
 			return
 		endif
 	endif
+
+
+
+	" Save where we are
+	" See: <URL:vimhelp:restore-position>
+	let old_scrolloff = &scrolloff
+	let &scrolloff=0
+	let inner_line = line('.')
+	exe 'normal! '.b:FTCSaveCol.'|'
+	let inner_col = col('.')
+	normal! H
+	let upper_line = line('.')
+	call cursor(inner_line, inner_col)
+	let mess_with_folding = 0
+	if has('folding') && &foldenable
+		normal! zn
+		let mess_with_folding = 1
+	endif
+
 
 
 
@@ -482,8 +515,17 @@ function s:DoCommentify(DaMode, DaBang, ...) " {{{
 	endif
 
 
-	" Return to where we were
-	execute SavedMark
+"	" Return to where we were
+	exe 'normal! '.b:FTCSaveCol.'|'
+	let inner_col = col('.')
+	if mess_with_folding
+		normal! zN
+	endif
+	call cursor(upper_line, inner_col)
+	normal! zt
+	call cursor(inner_line, inner_col)
+	let &scrolloff=old_scrolloff
+
 
 endfunction
 " }}}
@@ -509,20 +551,21 @@ function s:DLAC(...) range " {{{
 
 
 	" Save where we are
-	let SavedMark = line('.') . 'G'.b:FTCSaveCol.'|'
+	" See: <URL:vimhelp:restore-position>
+	let old_scrolloff = &scrolloff
+	let &scrolloff=0
+	let inner_line = line('.')
+	exe 'normal! '.b:FTCSaveCol.'|'
+	let inner_col = col('.')
 	normal! H
-	let SavedMark = 'normal! '.line('.').'Gzt'.SavedMark
-	if has('folding')
-		let SavedMark = SavedMark.'zN'
-	endif
-	execute SavedMark
-
-	" [Feral:201/02@03:43] folded lines must be opend because a substitute
-	" operation on a fold effects all lines of the fold.
-	" temp turn off folding.
-	if has('folding')
+	let upper_line = line('.')
+	call cursor(inner_line, inner_col)
+	let mess_with_folding = 0
+	if has('folding') && &foldenable
 		normal! zn
+		let mess_with_folding = 1
 	endif
+
 
 
 
@@ -574,10 +617,249 @@ function s:DLAC(...) range " {{{
 		set hlsearch
 	endif
 
-	" Return to where we were
-	execute SavedMark
-	" but goto to the new duplicate lines
-	execute ":".(a:lastline+1)
+"	" Return to where we were
+	exe 'normal! '.b:FTCSaveCol.'|'
+	let inner_col = col('.')
+	if mess_with_folding
+		normal! zN
+	endif
+	call cursor(upper_line, inner_col)
+	normal! zt
+"	call cursor(inner_line, inner_col)
+	call cursor(a:lastline+1, inner_col)
+	let &scrolloff=old_scrolloff
+
+"	" but goto to the new duplicate lines
+"	execute ":".(a:lastline+1)
+
+endfunction
+" }}}
+
+" [Feral:053/05@07:50] Comment and fold
+function s:CCF(String) range " {{{
+	" Initialize: CommentSymbol_L, CommentSymbol_R
+	execute s:FindCommentify()
+
+	" [Feral:201/02@01:46] GATE: nothing to do if we have no comment symbol.
+	" CommentSymbol_R is allowed to be blank so we only check CommentSymbol_L
+	if strlen(CommentSymbol_L) == 0
+		return
+	endif
+
+
+
+
+	" Save where we are
+	" See: <URL:vimhelp:restore-position>
+	let old_scrolloff = &scrolloff
+	let &scrolloff=0
+	let inner_line = line('.')
+	let inner_col = col('.')
+	normal! H
+	let upper_line = line('.')
+	call cursor(inner_line, inner_col)
+	let mess_with_folding = 0
+	if has('folding') && &foldenable
+		normal! zn
+		let mess_with_folding = 1
+	endif
+
+
+
+
+
+	let MessWith_HLS = 0
+	if &hlsearch
+		let MessWith_HLS = 1
+		set nohlsearch
+	endif
+
+
+	" Set report option to a huge value to prevent informative messages while
+	" deleting the lines
+	let old_report = &report
+	set report=99999
+
+	let SR = a:firstline.",".a:lastline
+
+	let EscapedCommentSymbol_L = escape(CommentSymbol_L, '/\\*')
+	let EscapedCommentSymbol_R = escape(CommentSymbol_R, '/\\*')
+
+	" Comment -- add the comment markers.
+	silent execute SR.':sm/^/'.EscapedCommentSymbol_L.'/'
+	if strlen(CommentSymbol_R)
+		silent execute SR.':sm/$/'.EscapedCommentSymbol_R.'/'
+	endif
+
+
+"	silent execute SR.':call s:DoCommentify(1, "")'
+
+	let DaString = CommentSymbol_L." }"."}}"
+	if strlen(CommentSymbol_R)
+		let DaString = DaString." ".CommentSymbol_R
+	endif
+	call append(a:lastline, DaString)
+
+
+
+
+	let DaString = CommentSymbol_L." {"."{{"
+	if strlen(a:String)
+		let DaString = DaString." ".a:String
+	endif
+	if strlen(CommentSymbol_R)
+		let DaString = DaString." ".CommentSymbol_R
+	endif
+	call append(a:firstline-1, DaString)
+
+
+	" Restore the report option
+	let &report = old_report
+
+	if MessWith_HLS
+		let MessWith_HLS = 0
+		set hlsearch
+	endif
+
+
+"	" Return to where we were
+	if mess_with_folding
+		normal! zN
+	endif
+	call cursor(upper_line, inner_col)
+	normal! zt
+	call cursor(inner_line, inner_col)
+	let &scrolloff=old_scrolloff
+
+endfunction
+" }}}
+
+" [Feral:059/05@01:48] Edit Block
+function s:ChangeMark(Bang, DoCommentBody, String) range " {{{
+	"
+	" Initialize: CommentSymbol_L, CommentSymbol_R
+	execute s:FindCommentify()
+
+	" [Feral:201/02@01:46] GATE: nothing to do if we have no comment symbol.
+	" CommentSymbol_R is allowed to be blank so we only check CommentSymbol_L
+	if strlen(CommentSymbol_L) == 0
+		return
+	endif
+
+
+	" Save where we are
+	" See: <URL:vimhelp:restore-position>
+	let old_scrolloff = &scrolloff
+	let &scrolloff=0
+	let inner_line = line('.')
+	let inner_col = col('.')
+	normal! H
+	let upper_line = line('.')
+	call cursor(inner_line, inner_col)
+	let mess_with_folding = 0
+	if has('folding') && &foldenable
+		normal! zn
+		let mess_with_folding = 1
+	endif
+
+
+
+
+
+
+	let MessWith_HLS = 0
+	if &hlsearch
+		let MessWith_HLS = 1
+		set nohlsearch
+	endif
+
+
+	" Set report option to a huge value to prevent informative messages while
+	" deleting the lines
+	let old_report = &report
+	set report=99999
+
+"	let SR = a:firstline.",".a:lastline
+
+	if a:DoCommentBody == 1
+		let SR = a:firstline.",".a:lastline
+
+		let EscapedCommentSymbol_L = escape(CommentSymbol_L, '/\\*')
+		let EscapedCommentSymbol_R = escape(CommentSymbol_R, '/\\*')
+
+		" Comment -- add the comment markers.
+		silent execute SR.':sm/^/'.EscapedCommentSymbol_L.'/'
+		if strlen(CommentSymbol_R)
+			silent execute SR.':sm/$/'.EscapedCommentSymbol_R.'/'
+		endif
+	endif
+
+
+"call FeralStub_AddNewExecute('', '\<fts\>', "norm! ".'"_ciw'."[Feral:\<C-R>=strftime('%j/%y@%H:%M')\<CR>] \<esc>")
+
+	if strlen(a:Bang)
+		" banged = folded
+		let DaString = CommentSymbol_L." }"."}}"
+	else
+		let DaString = CommentSymbol_L." }"
+	endif
+	let DaString = DaString." EO:"
+	if strlen(a:String)
+		let DaString = DaString." ".a:String
+	endif
+
+	if strlen(CommentSymbol_R)
+		let DaString = DaString." ".CommentSymbol_R
+	endif
+	call append(a:lastline, DaString)
+
+
+
+
+	if strlen(a:Bang)
+		" banged = folded
+		let DaString = CommentSymbol_L." {"."{{"
+	else
+		let DaString = CommentSymbol_L." {"
+	endif
+
+" [Feral:059/05@02:12] Something such as this in your .vimrc or where ever you
+" prefer. NOTE this 'bakes' the time and allows for all edits for a particular
+" session to carry the same time stamp.
+"let g:ChangeMarkID="[Feral:".strftime('%j/%y@%H:%M')."]"
+	if exists("g:ChangeMarkID")
+		let DaString = DaString." ".g:ChangeMarkID
+	endif
+
+	let DaString = DaString." SO:"
+	if strlen(a:String)
+		let DaString = DaString." ".a:String
+	endif
+
+	if strlen(CommentSymbol_R)
+		let DaString = DaString." ".CommentSymbol_R
+	endif
+	call append(a:firstline-1, DaString)
+
+
+	" Restore the report option
+	let &report = old_report
+
+	if MessWith_HLS
+		let MessWith_HLS = 0
+		set hlsearch
+	endif
+
+
+"	" Return to where we were
+	if mess_with_folding
+		normal! zN
+	endif
+	call cursor(upper_line, inner_col)
+	normal! zt
+	call cursor(inner_line, inner_col)
+	let &scrolloff=old_scrolloff
+
 
 endfunction
 " }}}
@@ -590,15 +872,9 @@ endfunction
 ":command -nargs=? -range CC :<line1>,<line2>call <SID>Commentify(<f-args>)
 ":command -nargs=? -range UC :<line1>,<line2>call <SID>UnCommentify(<f-args>)
 "}}}
-if !exists(":TC")
-	:command -nargs=? -range -bang TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, <q-bang>, <f-args>)
-endif
-if !exists(":CC")
-	:command -nargs=? -range -bang CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, <q-bang>, <f-args>)
-endif
-if !exists(":UC")
-	:command -nargs=? -range -bang UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, <q-bang>, <f-args>)
-endif
+:command -nargs=? -range -bang TC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(0, <q-bang>, <f-args>)
+:command -nargs=? -range -bang CC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(1, <q-bang>, <f-args>)
+:command -nargs=? -range -bang UC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DoCommentify(2, <q-bang>, <f-args>)
 
 "if !hasmapto('<Plug>FtcTc') && mapcheck("<M-c>", "nvi") == ""
 if !hasmapto('<Plug>FtcTc')
@@ -610,36 +886,21 @@ noremap <unique> <script> <Plug>FtcTc  :TC<CR>j
 
 
 
-" {{{ HOLDING: Old dlac mapping
-""[Feral:317/02@05:40] This is basicaly a hack; hopefully I'll COMBAK to this
-""	someday and clean it up. (there is no reason for a <plug> to rely on the
-""	:commands the script defines for example)
-"" DLAC -- duplicate line(s) and comment.
-"" Mangles mark z
-"if exists(":CC") && exists(":UC")
-"	if !hasmapto('<Plug>FtcDlacNormal') && mapcheck("<C-c>", "n") == ""
-"		" Normal Same keys as Multi-Edit, fwiw.
-"		"[Feral:314/02@19:28] Save shift is not recognised; these come out as
-"		"	<C-c>, dern!
-"		nmap <unique>	<C-c>	<plug>FtcDlacNormal
-"	endif
-"	if !hasmapto('<Plug>FtcDlacVisual') && mapcheck("<C-c>", "v") == ""
-"		" visual maping to handle multiple lines...
-"		vmap <unique>	<C-c>	<plug>FtcDlacVisual
-"	endif
-"
-"	noremap		<unique> <script> <Plug>FtcDlacNormal	mzyyp`z:CC<CR>j
-"	vnoremap	<unique> <script> <Plug>FtcDlacVisual	mz:CC<cr>gvyPgv:UC<CR>`z
-"endif
-" }}}
 :command -nargs=? -range DLAC		:let b:FTCSaveCol = virtcol('.')|<line1>,<line2>call <SID>DLAC(<f-args>)
 if !hasmapto('<Plug>FtcDLAC')
 	nmap <unique>	<C-c>	<Plug>FtcDLAC
 	vmap <unique>	<C-c>	<Plug>FtcDLAC
-" [Feral:194/03@07:08] Collision, See: i_CTRL-C
+" [Feral:194/03@07:08] Collision, See: <URL:VIMHELP:i_CTRL-C>
 "	imap <unique>	<C-c>	<esc><Plug>FtcDLAC
 endif
 noremap <unique> <script> <Plug>FtcDLAC  :DLAC<cr>
+
+
+" [Feral:053/05@07:50] Comment and fold
+:command -nargs=? -range CCF			:<line1>,<line2>call <SID>CCF(<q-args>)
+" [Feral:059/05@02:09] Change Mark
+:command -nargs=? -range -bang CM		:<line1>,<line2>call <SID>ChangeMark(<q-bang>,0,<q-args>)
+:command -nargs=? -range -bang CCM		:<line1>,<line2>call <SID>ChangeMark(<q-bang>,1,<q-args>)
 
 
 
